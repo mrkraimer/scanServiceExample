@@ -34,10 +34,8 @@ std::string ScanService::toString(ScanService::State state)
         return "IDLE";
     case READY:
         return "READY";
-    case RUNNING:
-        return "RUNNING";
-    case PAUSED:
-        return "PAUSED";
+    case SCANNING:
+        return "SCANNING";
      default:
         throw std::runtime_error("Unknown state");
     }
@@ -109,7 +107,7 @@ void ScanService::run()
         try {
             epicsThreadSleep(0.1);
             epics::pvData::Lock lock(mutex);
-            if (state == IDLE || state == RUNNING)
+            if (state == IDLE || state == SCANNING)
             {
                 if (positionRB != positionSP)
                 {
@@ -136,7 +134,7 @@ void ScanService::run()
                 }
             }
 
-            if (state == RUNNING && positionRB == positionSP)
+            if (state == SCANNING && positionRB == positionSP)
             {
                 if (index < points.size())
                 {
@@ -224,54 +222,27 @@ void ScanService::configure(const std::vector<Point> & newPoints)
         setSetpointImpl(positionRB);
 }
 
-void ScanService::runScan()
+void ScanService::startScan()
 {
     epics::pvData::Lock lock(mutex);
     if (state != READY)
     {
         std::stringstream ss;
-        ss << "Cannot run scanService unless it is READY. State is " << toString(state);
+        ss << "Cannot run startService unless it is READY. State is " << toString(state);
         throw std::runtime_error(ss.str());
     }
     std::cout << "Run" << std::endl;
     index = 0;
-    setStateImpl(RUNNING);
+    setStateImpl(SCANNING);
 }
 
-void ScanService::pause()
-{
-    epics::pvData::Lock lock(mutex);
-    if (state != RUNNING) 
-    {
-        std::stringstream ss;
-        ss << "Cannot pause scanService unless it is RUNNING. State is " << toString(state);
-        throw std::runtime_error(ss.str());
-    }
-    std::cout << "Pause" << std::endl;
-    setStateImpl(PAUSED);
- }
-
-void ScanService::resume()
-{
-    epics::pvData::Lock lock(mutex);
-    if (state != PAUSED) 
-    {
-        std::stringstream ss;
-        ss << "Cannot resume scanService unless it is PAUSED. State is " << toString(state);
-        throw std::runtime_error(ss.str());
-    }
-    std::cout << "Resume" << std::endl;
-    setStateImpl(RUNNING);
-
-}
 
 void ScanService::stopScan()
 {
     epics::pvData::Lock lock(mutex);
     switch (state)
     {
-    case RUNNING:
-    case PAUSED:
+    case SCANNING:
     case READY:
         std::cout << "Stop" << std::endl;
         setStateImpl(READY);
@@ -281,41 +252,8 @@ void ScanService::stopScan()
     default:
         {
             std::stringstream ss;
-            ss << "Cannot stop scanService unless it is RUNNING, PAUSED or READY. State is " << toString(state);
-            throw std::runtime_error(ss.str());
-        }
-    }
-}
-
-void ScanService::rewind(int n)
-{
-    epics::pvData::Lock lock(mutex);
-    switch (state)
-    {
-    case RUNNING:
-    case PAUSED:
-        if (n < 0)
-        {
-            std::stringstream ss;
-            ss << "Rewind argument cannot be negative. Argument is " << n;
-            throw std::runtime_error(ss.str());
-        }
-        if (n > 0)
-        {
-            size_t un = static_cast<size_t>(n);
-            std::cout << "Rewind(" << n << ")" << std::endl;
-            if (un < index)
-                index -= un+1;
-            else
-                index = 0;
-            setSetpointImpl(points[index]);
-            ++index;
-        }
-            break;
-    default:
-            {
-            std::stringstream ss;
-            ss << "Cannot rewind scanService unless it is RUNNING or PAUSED. State is " << toString(state);
+            ss << "Cannot stop scanService unless it is SCANNING or READY. State is "
+               << toString(state);
             throw std::runtime_error(ss.str());
         }
     }

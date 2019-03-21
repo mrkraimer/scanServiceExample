@@ -29,7 +29,6 @@ int main(int argc,char *argv[])
     string recordName;
 
     recordName = "scanServerRPC";
-recordName = "mydevice";
     pvRecord = ScanServerRPC::create(recordName);
     master->addRecord(pvRecord);
 

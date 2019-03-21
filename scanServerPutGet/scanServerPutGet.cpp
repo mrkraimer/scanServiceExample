@@ -73,13 +73,10 @@ static StructureConstPtr makeRecordStructure()
             add("positionRB", makePointTopStructure())->
             add("state", getStandardField()->enumerated("timeStamp"))->
             addNestedStructure("argument")->
-               addNestedStructure("command")->
-                  add("index",pvInt) ->
-                  addArray("choices",pvString)->
-                  endNested()->
-               addNestedStructureArray("configArg")->
-                  add("x",pvDouble) ->
-                  add("y",pvDouble) ->
+               add("command",pvString)->
+               addNestedStructure("configArg")->
+                  addArray("x",pvDouble) ->
+                  addArray("y",pvDouble) ->
                   endNested()->
                endNested()->
             addNestedStructure("result")->
@@ -155,15 +152,6 @@ ScanServerPutGetPtr ScanServerPutGet::create(
     PVDataCreatePtr pvDataCreate = getPVDataCreate();
 
     PVStructurePtr pvStructure = pvDataCreate->createPVStructure(makeRecordStructure());
-    PVEnumerated pvEnumerated;
-    bool result = pvEnumerated.attach(pvStructure->getSubField("argument.command"));
-    if(!result) throw std::runtime_error("attach failure");
-    StringArray choices(3);
-    choices[0] = "configure";
-    choices[1] = "start";
-    choices[2] = "stop";
-    result = pvEnumerated.setChoices(choices);
-    if(!result) throw std::runtime_error("setChoices failure");
     ScanServerPutGetPtr pvRecord(
         new ScanServerPutGet(recordName,pvStructure));
     pvRecord->initPvt();
@@ -189,11 +177,10 @@ ScanServerPutGet::ScanServerPutGet(
         pvTimeStamp_st.attach(pvStructure->getSubFieldT<PVStructure>("state.timeStamp"));
 
     PVStringArray::svector choices;
-    choices.reserve(4);
+    choices.reserve(3);
     choices.push_back(ScanService::toString(ScanService::IDLE));
     choices.push_back(ScanService::toString(ScanService::READY));
-    choices.push_back(ScanService::toString(ScanService::RUNNING));
-    choices.push_back(ScanService::toString(ScanService::PAUSED));
+    choices.push_back(ScanService::toString(ScanService::SCANNING));
     pvStateChoices->replace(freeze(choices));
 
     scanService = ScanService::create();
@@ -214,61 +201,52 @@ void ScanServerPutGet::initPvt()
 void ScanServerPutGet::process()
 {
     PVStructurePtr pvStructure(getPVStructure());
-    PVStringPtr pvResult = pvStructure->getSubField<PVString>("result.value");
-    PVIntPtr pvInt = pvStructure->getSubField<PVInt>("argument.command.index");
-    switch(pvInt->get()) 
-    {
-        case 0 :  // configure
-        {
-             PVStructureArrayPtr configArg
-                  = pvStructure->getSubField<PVStructureArray>("argument.configArg");
-             PVStructureArray::const_svector vals = configArg->view();
-             std::vector<Point> newPoints;
-             newPoints.reserve(vals.size());
-             for (PVStructureArray::const_svector::const_iterator it = vals.begin();
-                it != vals.end(); ++it)
-             {
-                 double x = (*it)->getSubFieldT<PVDouble>("x")->get();
-                 double y = (*it)->getSubFieldT<PVDouble>("y")->get();
-                 newPoints.push_back(Point(x,y));
-             }
-             try {
-                 getScanService()->configure(newPoints);
-                 pvResult->put("configure success");
-             } catch (std::exception& e) {
-                 string result("exception ");
-                 result += e.what();
-                 pvResult->put(result);
-            }
+    PVStringPtr pvResult(pvStructure->getSubField<PVString>("result.value"));
+    string command(pvStructure->getSubField<PVString>("argument.command")->get());
+    if(command=="configure") {
+        PVDoubleArrayPtr pvx(pvStructure->getSubField<PVDoubleArray>("argument.configArg.x"));
+        PVDoubleArrayPtr pvy(pvStructure->getSubField<PVDoubleArray>("argument.configArg.y"));
+        size_t npoints = pvx->getLength();
+        if(npoints!=pvy->getLength()) {
+           throw std::logic_error(
+               "argument.configArg.x and argument.configArg.y not same length");
         }
-        break;
-        case 1 :  // start
-        {
-            try {
-                 getScanService()->runScan();
-                 pvResult->put("run success");
-            } catch (std::exception& e) {
-                string result("exception ");
-                result += e.what();
-                pvResult->put(result);
-            }
+        std::vector<Point> newPoints(npoints);
+        PVDoubleArray::const_svector xvalue(pvx->view());
+        PVDoubleArray::const_svector yvalue(pvy->view());
+        for(size_t i=0; i<npoints; ++i) {
+             double x = xvalue[i];
+             double y = xvalue[i];
+             newPoints.push_back(Point(x,y));
         }
-        break;
-        case 2 :  // stop
-        {
-            try {
-                 getScanService()->stopScan();
-                 pvResult->put("stopScan success");
-            } catch (std::exception& e) {
-                string result("exception ");
-                result += e.what();
-                pvResult->put(result);
-            }
-        }
-        break;
-        default:
-            pvResult->put("illegal command index");
-        break;
+        try {
+            getScanService()->configure(newPoints);
+            pvResult->put("configure success");
+        } catch (std::exception& e) {
+            string result("exception ");
+            result += e.what();
+            pvResult->put(result);
+       }
+    } else if(command=="start") {
+       try {
+            getScanService()->startScan();
+            pvResult->put("startScan success");
+       } catch (std::exception& e) {
+           string result("exception ");
+           result += e.what();
+           pvResult->put(result);
+       }
+    } else if(command=="stop") {
+       try {
+            getScanService()->stopScan();
+            pvResult->put("stopScan success");
+       } catch (std::exception& e) {
+           string result("exception ");
+           result += e.what();
+           pvResult->put(result);
+       }
+    } else {
+       pvResult->put("illegal command index");
     }
     PVRecord::process();
 }

@@ -78,7 +78,7 @@ public:
     static ScanServicePtr create();
     POINTER_DEFINITIONS(ScanService);
     enum State {
-        IDLE, READY, RUNNING, PAUSED
+        IDLE, READY, SCANNING
     };
     static std::string toString(State state);
     State getState();
@@ -94,11 +94,8 @@ public:
     void setSetpoint(Point sp);
     void abort();
     void configure(const std::vector<Point> & newPoints);
-    void runScan();
-    void pause();
-    void resume();
+    void startScan();
     void stopScan();
-    void rewind(int n);
 private:
     ScanService();
     void setSetpointImpl(Point sp);

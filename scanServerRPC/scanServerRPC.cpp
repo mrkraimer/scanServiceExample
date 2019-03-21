@@ -90,24 +90,6 @@ static StructureConstPtr makeRecordStructure()
     return recordStructure;
 }
 
-
-
-void AbortService::request(
-    PVStructure::shared_pointer const & args,
-    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-)
-{
-    try {
-        pvRecord->getScanService()->abort();
-    }
-    catch (std::exception& e) {
-        throw epics::pvAccess::RPCRequestException(
-            Status::STATUSTYPE_ERROR,e.what());
-    }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
-}
-
-
 void ConfigureService::request(
     PVStructure::shared_pointer const & args,
     epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
@@ -153,44 +135,13 @@ void ConfigureService::request(
     callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
 }
 
-void RunService::request(
+void StartService::request(
     PVStructure::shared_pointer const & args,
     epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
 )
 {
     try {
-        pvRecord->getScanService()->runScan();
-    }
-    catch (std::exception& e) {
-        throw epics::pvAccess::RPCRequestException(
-            Status::STATUSTYPE_ERROR,e.what());
-    }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
-}
-
-
-void PauseService::request(
-    PVStructure::shared_pointer const & args,
-    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-)
-{
-    try {
-        pvRecord->getScanService()->pause();
-    }
-    catch (std::exception& e) {
-        throw epics::pvAccess::RPCRequestException(
-            Status::STATUSTYPE_ERROR,e.what());
-    }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
-}
-
-void ResumeService::request(
-    PVStructure::shared_pointer const & args,
-    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-)
-{
-    try {
-        pvRecord->getScanService()->resume();
+        pvRecord->getScanService()->startScan();
     }
     catch (std::exception& e) {
         throw epics::pvAccess::RPCRequestException(
@@ -215,33 +166,6 @@ void StopService::request(
 }
 
 
-int RewindService::getRequestedSteps(PVStructurePtr const & args)
-{
-    PVIntPtr valueField = args->getSubField<PVInt>("value");
-    if (valueField.get() == NULL)
-        throw epics::pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
-            "No int value field");
-
-    return valueField->get();
-}
-
-void RewindService::request(
-    PVStructure::shared_pointer const & args,
-    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-)
-{
-    int n = getRequestedSteps(args);
-    try {
-        pvRecord->getScanService()->rewind(n);
-    }
-    catch (std::exception& e) {
-        throw epics::pvAccess::RPCRequestException(
-            Status::STATUSTYPE_ERROR,e.what());
-    }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
-}
-
-
 ScanRPCService::Callback::shared_pointer ScanRPCService::Callback::create(ScanRPCServicePtr const & service)
 {
     return ScanRPCService::Callback::shared_pointer(new ScanRPCService::Callback(service));
@@ -251,7 +175,7 @@ void ScanRPCService::request(
     PVStructurePtr const & args,
     epics::pvAccess::RPCResponseCallback::shared_pointer const & callback)
 {
-    pvRecord->getScanService()->runScan();
+    pvRecord->getScanService()->startScan();
     ScanRPCService::Callback::shared_pointer cb = ScanRPCService::Callback::create(shared_from_this());
     this->rpcCallback = callback;
     this->scanServiceCallback = cb;
@@ -399,11 +323,10 @@ ScanServerRPC::ScanServerRPC(
         pvTimeStamp_st.attach(pvStructure->getSubFieldT<PVStructure>("state.timeStamp"));
 
     PVStringArray::svector choices;
-    choices.reserve(4);
+    choices.reserve(3);
     choices.push_back(ScanService::toString(ScanService::IDLE));
     choices.push_back(ScanService::toString(ScanService::READY));
-    choices.push_back(ScanService::toString(ScanService::RUNNING));
-    choices.push_back(ScanService::toString(ScanService::PAUSED));
+    choices.push_back(ScanService::toString(ScanService::SCANNING));
     pvStateChoices->replace(freeze(choices));
 
     scanService = ScanService::create();
@@ -429,51 +352,21 @@ epics::pvAccess::RPCServiceAsync::shared_pointer ScanServerRPC::getService(
     if (methodField.get() != 0)
     {
         std::string method = methodField->get();
-        if (method == "abort")
-        {
-             return AbortService::create(
-                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
-                 shared_from_this()));
-        }
-        else if (method == "configure")
+        if (method == "configure")
         {
             return ConfigureService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
         }
-        else if (method == "run")
+        else if (method == "start")
         {
-            return RunService::create(
-                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
-                 shared_from_this()));
-        }
-        else if (method == "resume")
-        {
-            return ResumeService::create(
-                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
-                 shared_from_this()));
-        }
-        else if (method == "pause")
-        {
-            return PauseService::create(
+            return StartService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
         }
         else if (method == "stop")
         {
             return StopService::create(
-                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
-                 shared_from_this()));
-        }
-        else if (method == "rewind")
-        {
-            return RewindService::create(
-                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
-                 shared_from_this()));
-        }
-        else if (method  == "scan")
-        {
-            return ScanRPCService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
         }

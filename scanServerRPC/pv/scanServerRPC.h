@@ -20,58 +20,22 @@
 
 namespace epics { namespace exampleScan { 
 
-class AbortService;
-typedef std::tr1::shared_ptr<AbortService> AbortServicePtr;
 
 class ConfigureService;
 typedef std::tr1::shared_ptr<ConfigureService> ConfigureServicePtr;
 
-class RunService;
-typedef std::tr1::shared_ptr<RunService> RunServicePtr;
-
-class PauseService;
-typedef std::tr1::shared_ptr<PauseService> PauseServicePtr;
-
-class ResumeService;
-typedef std::tr1::shared_ptr<ResumeService> ResumeServicePtr;
+class StartService;
+typedef std::tr1::shared_ptr<StartService> StartServicePtr;
 
 class StopService;
 typedef std::tr1::shared_ptr<StopService> StopServicePtr;
 
-class RewindService;
-typedef std::tr1::shared_ptr<RewindService> RewindServicePtr;
 
 class ScanRPCService;
 typedef std::tr1::shared_ptr<ScanRPCService> ScanRPCServicePtr;
 
 class ScanServerRPC;
 typedef std::tr1::shared_ptr<ScanServerRPC> ScanServerRPCPtr;
-
-class epicsShareClass AbortService :
-    public epics::pvAccess::RPCServiceAsync
-{
-public:
-    POINTER_DEFINITIONS(AbortService);
-
-    static AbortService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
-    {
-        return AbortServicePtr(new AbortService(pvRecord));
-    }
-    ~AbortService() {};
- 
-    void request(
-        epics::pvData::PVStructurePtr const & args,
-        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-    );
-private:
-    AbortService(ScanServerRPCPtr const & pvRecord)
-    : pvRecord(pvRecord)
-    {
-    }
-
-    ScanServerRPCPtr pvRecord;
-};
-
 
 class epicsShareClass ConfigureService :
     public virtual epics::pvAccess::RPCServiceAsync
@@ -99,74 +63,24 @@ private:
 };
 
 
-class epicsShareClass RunService :
+class epicsShareClass StartService :
     public virtual epics::pvAccess::RPCServiceAsync
 {
 public:
-    POINTER_DEFINITIONS(RunService);
+    POINTER_DEFINITIONS(StartService);
 
-    static RunService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
+    static StartService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
     {
-        return RunServicePtr(new RunService(pvRecord));
+        return StartServicePtr(new StartService(pvRecord));
     }
-    ~RunService() {};
+    ~StartService() {};
 
     void request(
         epics::pvData::PVStructurePtr const & args,
         epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
     ); 
 private:
-    RunService(ScanServerRPCPtr const & pvRecord)
-    : pvRecord(pvRecord)
-    {
-    }
-
-    ScanServerRPCPtr pvRecord;
-};
-
-class epicsShareClass PauseService :
-    public virtual epics::pvAccess::RPCServiceAsync
-{
-public:
-    POINTER_DEFINITIONS(PauseService);
-
-    static PauseService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
-    {
-        return PauseServicePtr(new PauseService(pvRecord));
-    }
-    ~PauseService() {};
-
-    void request(
-        epics::pvData::PVStructurePtr const & args,
-        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-    ); 
-private:
-    PauseService(ScanServerRPCPtr const & pvRecord)
-    : pvRecord(pvRecord)
-    {
-    }
-
-    ScanServerRPCPtr pvRecord;
-};
-
-class epicsShareClass ResumeService :
-    public virtual epics::pvAccess::RPCServiceAsync
-{
-public:
-    POINTER_DEFINITIONS(ResumeService);
-
-    static ResumeService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
-    {
-        return ResumeServicePtr(new ResumeService(pvRecord));
-    }
-    ~ResumeService() {};
-
-    void request(
-        epics::pvData::PVStructurePtr const & args,
-        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-    ); 
-private:
-    ResumeService(ScanServerRPCPtr const & pvRecord)
+    StartService(ScanServerRPCPtr const & pvRecord)
     : pvRecord(pvRecord)
     {
     }
@@ -192,34 +106,6 @@ public:
     ); 
 private:
     StopService(ScanServerRPCPtr const & pvRecord)
-    : pvRecord(pvRecord)
-    {
-    }
-
-    ScanServerRPCPtr pvRecord;
-};
-
-class epicsShareClass RewindService :
-    public virtual epics::pvAccess::RPCServiceAsync
-{
-public:
-    POINTER_DEFINITIONS(RewindService);
-
-    static RewindService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
-    {
-        return RewindServicePtr(new RewindService(pvRecord));
-    }
-    ~RewindService() {};
-
-    void request(
-        epics::pvData::PVStructurePtr const & args,
-        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
-    ); 
-private:
-    int getRequestedSteps(epics::pvData::PVStructurePtr const & args);
-
-private:
-    RewindService(ScanServerRPCPtr const & pvRecord)
     : pvRecord(pvRecord)
     {
     }
