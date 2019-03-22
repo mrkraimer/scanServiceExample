@@ -71,7 +71,6 @@ static StructureConstPtr makeRecordStructure()
         recordStructure = fieldCreate->createFieldBuilder()->
             add("positionSP", makePointTopStructure())->
             add("positionRB", makePointTopStructure())->
-            add("state", getStandardField()->enumerated("timeStamp"))->
             addNestedStructure("argument")->
                add("command",pvString)->
                addNestedStructure("configArg")->
@@ -122,16 +121,6 @@ void ScanServerPutGet::update(int flags)
             pvTimeStamp_rb.set(timeStamp);
         }
 
-        if ((flags & ScanService::Callback::STATE_CHANGED) != 0)
-        {
-            int index = static_cast<int>(scanService->getState());
-            if (index != pvStateIndex->get())
-            {
-                pvStateIndex->put(index);
-                pvTimeStamp_st.set(timeStamp);
-            }
-        }
-
         pvTimeStamp.set(timeStamp);
         endGroupPut();
     }
@@ -168,20 +157,9 @@ ScanServerPutGet::ScanServerPutGet(
     pvx_rb = pvStructure->getSubFieldT<PVDouble>("positionRB.value.x");
     pvy_rb = pvStructure->getSubFieldT<PVDouble>("positionRB.value.y");
 
-    pvStateIndex = pvStructure->getSubFieldT<PVInt>("state.value.index");
-    PVStringArrayPtr pvStateChoices
-        = pvStructure->getSubFieldT<PVStringArray>("state.value.choices");
     pvTimeStamp.attach(pvStructure->getSubFieldT<PVStructure>("timeStamp"));
     pvTimeStamp_sp.attach(pvStructure->getSubFieldT<PVStructure>("positionSP.timeStamp"));
     pvTimeStamp_rb.attach(pvStructure->getSubFieldT<PVStructure>("positionRB.timeStamp"));
-        pvTimeStamp_st.attach(pvStructure->getSubFieldT<PVStructure>("state.timeStamp"));
-
-    PVStringArray::svector choices;
-    choices.reserve(3);
-    choices.push_back(ScanService::toString(ScanService::IDLE));
-    choices.push_back(ScanService::toString(ScanService::READY));
-    choices.push_back(ScanService::toString(ScanService::SCANNING));
-    pvStateChoices->replace(freeze(choices));
 
     scanService = ScanService::create();
 }

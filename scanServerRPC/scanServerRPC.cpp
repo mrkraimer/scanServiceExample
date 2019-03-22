@@ -83,7 +83,6 @@ static StructureConstPtr makeRecordStructure()
         recordStructure = fieldCreate->createFieldBuilder()->
             add("positionSP", makePointTopStructure())->
             add("positionRB", makePointTopStructure())->
-            add("state", getStandardField()->enumerated("timeStamp"))->
             add("timeStamp", getStandardField()->timeStamp())->
             createStructure();
     }
@@ -193,17 +192,6 @@ void ScanRPCService::handleError(const std::string & message)
          scanServiceCallback);
 }
 
-void ScanRPCService::stateChanged(ScanService::State state)
-{
-    if (state == ScanService::READY)
-    {
-        handleError("Scan was stopped");
-    }
-    else if (state == ScanService::IDLE)
-    {
-        handleError("Scan was aborted");
-    }
-}
 
 void ScanRPCService::scanComplete()
 {
@@ -217,11 +205,6 @@ void ScanRPCService::update(int flags)
     if ((flags & ScanService::Callback::SCAN_COMPLETE) != 0)
     {
        scanComplete();
-    }
-    else if ((flags & ScanService::Callback::STATE_CHANGED) != 0)
-    {
-        ScanService::State state = pvRecord->getScanService()->getState();
-        stateChanged(state);
     }
 }
 
@@ -265,16 +248,6 @@ void ScanServerRPC::update(int flags)
             pvTimeStamp_rb.set(timeStamp);
         }
 
-        if ((flags & ScanService::Callback::STATE_CHANGED) != 0)
-        {
-            int index = static_cast<int>(scanService->getState());
-            if (index != pvStateIndex->get())
-            {
-                pvStateIndex->put(index);
-                pvTimeStamp_st.set(timeStamp);
-            }
-        }
-
         pvTimeStamp.set(timeStamp);
         endGroupPut();
     }
@@ -314,21 +287,10 @@ ScanServerRPC::ScanServerRPC(
     pvx_rb = pvStructure->getSubFieldT<PVDouble>("positionRB.value.x");
     pvy_rb = pvStructure->getSubFieldT<PVDouble>("positionRB.value.y");
 
-    pvStateIndex = pvStructure->getSubFieldT<PVInt>("state.value.index");
-    pvStateChoices = pvStructure->getSubFieldT<PVStringArray>("state.value.choices");
 
     pvTimeStamp.attach(pvStructure->getSubFieldT<PVStructure>("timeStamp"));
     pvTimeStamp_sp.attach(pvStructure->getSubFieldT<PVStructure>("positionSP.timeStamp"));
     pvTimeStamp_rb.attach(pvStructure->getSubFieldT<PVStructure>("positionRB.timeStamp"));
-        pvTimeStamp_st.attach(pvStructure->getSubFieldT<PVStructure>("state.timeStamp"));
-
-    PVStringArray::svector choices;
-    choices.reserve(3);
-    choices.push_back(ScanService::toString(ScanService::IDLE));
-    choices.push_back(ScanService::toString(ScanService::READY));
-    choices.push_back(ScanService::toString(ScanService::SCANNING));
-    pvStateChoices->replace(freeze(choices));
-
     scanService = ScanService::create();
 }
 
@@ -410,17 +372,9 @@ void ScanServerRPC::process()
         pvy_rb->put(scanService_rb.y);        
     }
 
-    // If state is written to, restore value
-    int index = static_cast<int>(scanService->getState());
-    if (index != pvStateIndex->get())
-    {
-        pvStateIndex->put(index);
-    }
-
     if (firstTime) {
         pvTimeStamp_sp.set(timeStamp);
         pvTimeStamp_rb.set(timeStamp);
-        pvTimeStamp_st.set(timeStamp);
         firstTime = false;
     }
 

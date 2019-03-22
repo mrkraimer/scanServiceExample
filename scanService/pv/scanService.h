@@ -71,17 +71,12 @@ public:
         virtual void update(int flags) = 0;
         const static int SETPOINT_CHANGED  = 0x1;
         const static int READBACK_CHANGED  = 0x2;
-        const static int STATE_CHANGED     = 0x4;
-        const static int SCAN_COMPLETE     = 0x8;
+        const static int SCAN_COMPLETE     = 0x4;
     };
 public:
     static ScanServicePtr create();
     POINTER_DEFINITIONS(ScanService);
-    enum State {
-        IDLE, READY, SCANNING
-    };
-    static std::string toString(State state);
-    State getState();
+    bool isScanning() {return scanningActive;}
     virtual bool init() { return false;}
     virtual void run();
     void startThread() { thread->start(); }
@@ -92,7 +87,6 @@ public:
     Point getPositionSetpoint();
     Point getPositionReadback();
     void setSetpoint(Point sp);
-    void abort();
     void configure(const std::vector<Point> & newPoints);
     void startScan();
     void stopScan();
@@ -100,9 +94,7 @@ private:
     ScanService();
     void setSetpointImpl(Point sp);
     void setReadbackImpl(Point rb);
-    void setStateImpl(State state);
-    void scanComplete();
-    State state;
+    bool scanningActive;
     int flags;
     Point positionSP;
     Point positionRB;

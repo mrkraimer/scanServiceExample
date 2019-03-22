@@ -13,18 +13,76 @@
 #include <epicsThread.h>
 #include <pv/pvaClient.h>
 #include <pv/convert.h>
+#include <pv/rpcClient.h>
 
 using namespace std;
 using namespace epics::pvData;
 using namespace epics::pvAccess;
 using namespace epics::pvaClient;
+static StructureConstPtr makeRequestStructure()
+{
+    static StructureConstPtr requestStructure;
+    if (requestStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
 
-class ClientPutGet;
-typedef std::tr1::shared_ptr<ClientPutGet> ClientPutGetPtr;
+        requestStructure = fieldCreate->createFieldBuilder()->
+            add("method", pvString)->
+            createStructure();
+    }
+    return requestStructure;
+}
 
-class ClientPutGet :
+static StructureConstPtr makePointStructure()
+{
+    static StructureConstPtr pointStructure;
+    if (pointStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        pointStructure = fieldCreate->createFieldBuilder()->
+            setId("point_t")->
+            add("x",pvDouble)->
+            add("y",pvDouble)->
+            createStructure();
+    }
+    return pointStructure;
+}
+
+static StructureConstPtr makeArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        argStructure = fieldCreate->createFieldBuilder()->
+            createStructure();
+    }
+    return argStructure;
+}
+
+static StructureConstPtr makeConfigureArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        argStructure = fieldCreate->createFieldBuilder()->
+            addArray("value", makePointStructure())->
+            createStructure();
+    }
+    return argStructure;
+}
+
+
+class ClientRPC;
+typedef std::tr1::shared_ptr<ClientRPC> ClientRPCPtr;
+
+class ClientRPC :
     public PvaClientChannelStateChangeRequester,
-    public std::tr1::enable_shared_from_this<ClientPutGet>
+    public std::tr1::enable_shared_from_this<ClientRPC>
 {
 private:
     string channelName;
@@ -33,7 +91,6 @@ private:
     bool channelConnected;
 
     PvaClientChannelPtr pvaClientChannel;
-    PvaClientPutGetPtr pvaClientPutGet;
 
     void init(PvaClientPtr const &pvaClient)
     {
@@ -42,8 +99,8 @@ private:
         pvaClientChannel->issueConnect();
     }
 public:
-    POINTER_DEFINITIONS(ClientPutGet);
-    ClientPutGet(
+    POINTER_DEFINITIONS(ClientRPC);
+    ClientRPC(
         const string &channelName,
         const string &providerName,
         const string &request)
@@ -54,14 +111,14 @@ public:
     {
     }
     
-    static ClientPutGetPtr create(
+    static ClientRPCPtr create(
         PvaClientPtr const &pvaClient,
         const string & channelName,
         const string & providerName,
         const string  & request)
     {
-        ClientPutGetPtr client(ClientPutGetPtr(
-             new ClientPutGet(channelName,providerName,request)));
+        ClientRPCPtr client(ClientRPCPtr(
+             new ClientRPC(channelName,providerName,request)));
         client->init(pvaClient);
         return client;
     }
@@ -69,31 +126,25 @@ public:
     virtual void channelStateChange(PvaClientChannelPtr const & channel, bool isConnected)
     {
         channelConnected = isConnected;
-        if(isConnected) {
-            if(!pvaClientPutGet) {
-                pvaClientPutGet = pvaClientChannel->createPutGet(request);
-                pvaClientPutGet->issueConnect();
-            }
-        }
     }
 
-    void putGetConfigure(const string & input)
+    void commandConfigure(const string & input)
     {
         if(!channelConnected) {
             cout << channelName << " channel not connected\n";
             return;
         }
-        vector<string> values;
+        vector<string> strvalues;
         size_t pos = 0;
         size_t n = 1;
         while(true)
         {
             size_t offset = input.find(" ",pos);
             if(offset==string::npos) {
-                 values.push_back(input.substr(pos));
+                 strvalues.push_back(input.substr(pos));
                  break;
             }
-            values.push_back(input.substr(pos,offset-pos));
+            strvalues.push_back(input.substr(pos,offset-pos));
             pos = offset+1;
             n++;
         }
@@ -107,55 +158,58 @@ public:
         size_t ind = 0;
         for(size_t i= 0; i < npts; ++i)
         {
-             x[i] = values[ind++];
-             y[i] = values[ind++];
-        }                   
-        PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
-        PVStructurePtr pvStructure = putData->getPVStructure();
-cout << "pvStructure\n" << pvStructure << "\n";
-        PVScalarArrayPtr pvx(pvStructure->getSubField<PVScalarArray>("argument.configArg.x"));
-        if(!pvx) throw std::runtime_error("argument.configArg.x not found");
-        PVScalarArrayPtr pvy(pvStructure->getSubField<PVScalarArray>("argument.configArg.y"));
-        if(!pvy) throw std::runtime_error("argument.configArg.y not found");
-        ConvertPtr convert = getConvert();
-        pvx->setLength(npts);
-        convert->fromStringArray(pvx,0,npts,x,0);        
-        pvy->setLength(npts);
-        convert->fromStringArray(pvy,0,npts,y,0);    
-        PVStringPtr pvCommand(pvStructure->getSubField<PVString>("argument.command"));
-        if(!pvCommand) throw std::runtime_error("argument.command not found");
-        pvCommand->put("configure");
-        pvaClientPutGet->putGet();
-        PvaClientGetDataPtr getData = pvaClientPutGet->getGetData();
-        cout << getData->getPVStructure() << endl;
+             x[i] = strvalues[ind++];
+             y[i] = strvalues[ind++];
+        }
+        PVStructurePtr pvArguments(
+             getPVDataCreate()->createPVStructure(
+                 makeConfigureArgumentStructure()));
+        PVStructureArray::svector values;
+        for(size_t i=0; i< npts; ++i) 
+        {
+             PVStructurePtr point(getPVDataCreate()->createPVStructure(makePointStructure()));
+             point->getSubField<PVDouble>("x")->put(stod(x[i]));
+             point->getSubField<PVDouble>("y")->put(stod(y[i]));
+             values.push_back(point);
+        }
+        pvArguments->getSubField<PVStructureArray>("value")->replace(freeze(values));
+        PVStructurePtr pvRequest = 
+             getPVDataCreate()->createPVStructure(makeRequestStructure());
+        pvRequest->getSubFieldT<PVString>("method")->put("configure");
+        PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
+        cout << "response\n" << response << "\n";
     }
 
-    void putGetStart()
+    void commandStart()
     {
         if(!channelConnected) {
             cout << channelName << " channel not connected\n";
             return;
         }
-        PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
-        PVStructurePtr pvStructure = putData->getPVStructure();
-        PVStringPtr pvCommand(pvStructure->getSubField<PVString>("argument.command"));
-        if(!pvCommand) throw std::runtime_error("argument.command not found");
-        pvCommand->put("start");
-        pvaClientPutGet->putGet();
+        PVStructurePtr pvArguments(
+             getPVDataCreate()->createPVStructure(
+                 makeArgumentStructure()));
+        PVStructurePtr pvRequest = 
+             getPVDataCreate()->createPVStructure(makeRequestStructure());
+        pvRequest->getSubFieldT<PVString>("method")->put("start");
+        PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
+        cout << "response\n" << response << "\n";
     }
 
-    void putGetStop()
+    void commandStop()
     {
         if(!channelConnected) {
             cout << channelName << " channel not connected\n";
             return;
         }
-        PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
-        PVStructurePtr pvStructure = putData->getPVStructure();
-        PVStringPtr pvCommand(pvStructure->getSubField<PVString>("argument.command"));
-        if(!pvCommand) throw std::runtime_error("argument.command not found");
-        pvCommand->put("stop");
-        pvaClientPutGet->putGet();
+        PVStructurePtr pvArguments(
+             getPVDataCreate()->createPVStructure(
+                 makeArgumentStructure()));
+        PVStructurePtr pvRequest = 
+             getPVDataCreate()->createPVStructure(makeRequestStructure());
+        pvRequest->getSubFieldT<PVString>("method")->put("stop");
+        PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
+        cout << "response\n" << response << "\n";       
     }
 };
 
@@ -186,7 +240,7 @@ int main(int argc,char *argv[])
         }
     }
     string provider("pva");
-    string channelName("scanServerPutGet");
+    string channelName("scanServerRPC");
     string request("putField(argument)getField(result)");
     bool debug(false);
     bool interactive(false);
@@ -236,11 +290,11 @@ int main(int argc,char *argv[])
          << " interactive " << (interactive ? "true" : "false")
          << endl;
     int nPvs = argc - optind;       /* Remaining arg list for not interactive */
-    cout << "_____scanClientPutGet starting__\n";
+    cout << "_____scanClientRPC starting__\n";
     if(debug) PvaClient::setDebug(true);
     try {   
         PvaClientPtr pva= PvaClient::get(provider);
-        ClientPutGetPtr clientPutGet(ClientPutGet::create(pva,channelName,provider,request));
+        ClientRPCPtr clientRPC(ClientRPC::create(pva,channelName,provider,request));
         if(!interactive) {
             epicsThreadSleep(1.0);
             if(nPvs<1) throw std::runtime_error("no command specified");
@@ -253,11 +307,11 @@ int main(int argc,char *argv[])
                     if(!first) { input += " ";} else { first=false;}
                     input += argv[i];
                 }
-                clientPutGet->putGetConfigure(input);
+                clientRPC->commandConfigure(input);
             } else if(command=="start") {
-                 clientPutGet->putGetStart();
+                 clientRPC->commandStart();
             } else if(command=="stop") {
-                 clientPutGet->putGetStop();
+                 clientRPC->commandStop();
             } else {
                 cout << "unknown command\n";
             }
@@ -275,11 +329,11 @@ int main(int argc,char *argv[])
                     cout << "enter x y values\n";
                     string input;
                     getline(cin,input);
-                    clientPutGet->putGetConfigure(input);
+                    clientRPC->commandConfigure(input);
                 } else if(command=="start") {
-                     clientPutGet->putGetStart();
+                     clientRPC->commandStart();
                 } else if(command=="stop") {
-                     clientPutGet->putGetStop();
+                     clientRPC->commandStop();
                 } else {
                         cout << "unknown command\n";
                 }

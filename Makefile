@@ -14,6 +14,9 @@ scanServerRPC_DEPEND_DIRS = configure
 DIRS += scanServerPutGet
 scanServerPutGet_DEPEND_DIRS = configure
 
+DIRS += scanClientRPC
+scanClientRPC_DEPEND_DIRS = configure
+
 DIRS += scanClientPutGet
 scanClientPutGet_DEPEND_DIRS = configure
 

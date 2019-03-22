@@ -26,27 +26,6 @@ ScanServicePtr ScanService::create()
     return ScanServicePtr(new ScanService());
 }
 
-std::string ScanService::toString(ScanService::State state)
-{
-    switch(state)
-    {
-    case IDLE:
-        return "IDLE";
-    case READY:
-        return "READY";
-    case SCANNING:
-        return "SCANNING";
-     default:
-        throw std::runtime_error("Unknown state");
-    }
-}
-
-ScanService::State ScanService::getState()
-{
-    epics::pvData::Lock lock(mutex);
-    return state;
-}
-
 void ScanService::registerCallback(Callback::shared_pointer const & callback)
 {
     epics::pvData::Lock lock(mutex);
@@ -64,12 +43,6 @@ bool ScanService::unregisterCallback(ScanService::Callback::shared_pointer const
     callbacks.erase(foundCB);
     return found;
 }
-
-void ScanService::scanComplete()
-{
-    flags |= ScanService::Callback::SCAN_COMPLETE;
-}
-
 
 void ScanService::update()
 {
@@ -90,7 +63,7 @@ void ScanService::update()
 }
 
 ScanService::ScanService()
-: state(IDLE), index(0)
+: scanningActive(false), index(0)
 {
    thread = EpicsThreadPtr(new epicsThread(
         *this,
@@ -107,7 +80,7 @@ void ScanService::run()
         try {
             epicsThreadSleep(0.1);
             epics::pvData::Lock lock(mutex);
-            if (state == IDLE || state == SCANNING)
+            if (scanningActive)
             {
                 if (positionRB != positionSP)
                 {
@@ -134,7 +107,7 @@ void ScanService::run()
                 }
             }
 
-            if (state == SCANNING && positionRB == positionSP)
+            if (scanningActive && positionRB == positionSP)
             {
                 if (index < points.size())
                 {
@@ -143,7 +116,7 @@ void ScanService::run()
                 }
                 else
                 {
-                    scanComplete();
+                    flags |= ScanService::Callback::SCAN_COMPLETE;
                     stopScan();
                 }
             }
@@ -166,10 +139,10 @@ Point ScanService::getPositionReadback()
 
 void ScanService::setSetpoint(Point sp)
 {
-    if (state != IDLE)
+    if(scanningActive) 
     {
         std::stringstream ss;
-        ss << "Cannot set position setpoint unless scanService is IDLE. State is " << toString(state);
+        ss << "Cannot set position setpoint while scanning active ";
         throw std::runtime_error(ss.str());
     }
     setSetpointImpl(sp);
@@ -187,35 +160,16 @@ void ScanService::setReadbackImpl(Point rb)
     flags |= ScanService::Callback::READBACK_CHANGED;
 }
 
-void ScanService::setStateImpl(State state)
-{
-    this->state = state;
-    flags |= ScanService::Callback::STATE_CHANGED;  
-}
-
-
-void ScanService::abort()
-{
-    epics::pvData::Lock lock(mutex);
-    std::cout << "Abort" << std::endl;
-    setStateImpl(IDLE);
-    points.clear();
-    if (positionSP != positionRB)
-        setSetpointImpl(positionRB);
-}
-
 void ScanService::configure(const std::vector<Point> & newPoints)
 {
     epics::pvData::Lock lock(mutex);
-    if (state != IDLE)
+    if(scanningActive) 
     {
         std::stringstream ss;
-        ss << "Cannot configure scanService unless it is IDLE. State is " << toString(state);
+        ss << "Cannot configure while scanning active ";
         throw std::runtime_error(ss.str());
-
     }
     std::cout << "Configure" << std::endl;
-    setStateImpl(READY);
     points = newPoints;
 
     if (positionSP != positionRB)
@@ -225,38 +179,28 @@ void ScanService::configure(const std::vector<Point> & newPoints)
 void ScanService::startScan()
 {
     epics::pvData::Lock lock(mutex);
-    if (state != READY)
+    if(scanningActive) 
     {
         std::stringstream ss;
-        ss << "Cannot run startService unless it is READY. State is " << toString(state);
+        ss << "Cannot startScan while scanning active ";
         throw std::runtime_error(ss.str());
     }
     std::cout << "Run" << std::endl;
     index = 0;
-    setStateImpl(SCANNING);
+    scanningActive = true;
 }
-
 
 void ScanService::stopScan()
 {
     epics::pvData::Lock lock(mutex);
-    switch (state)
+    if(!scanningActive) 
     {
-    case SCANNING:
-    case READY:
-        std::cout << "Stop" << std::endl;
-        setStateImpl(READY);
-        if (positionSP != positionRB)
-            setSetpointImpl(positionRB);
-        break;
-    default:
-        {
-            std::stringstream ss;
-            ss << "Cannot stop scanService unless it is SCANNING or READY. State is "
-               << toString(state);
-            throw std::runtime_error(ss.str());
-        }
+        std::stringstream ss;
+        ss << "Cannot stopScan unless scanning active ";
+        throw std::runtime_error(ss.str());
     }
+    std::cout << "Stop" << std::endl;
+    scanningActive = false;
 }
 
 }}

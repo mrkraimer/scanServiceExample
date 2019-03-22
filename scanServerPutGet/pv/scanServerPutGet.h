@@ -64,13 +64,9 @@ private:
     epics::pvData::PVDoublePtr      pvx_rb;
     epics::pvData::PVDoublePtr      pvy_rb;
 
-    epics::pvData::PVIntPtr         pvStateIndex;
-    epics::pvData::PVStringArrayPtr pvStateChoices;
-
     epics::pvData::PVTimeStamp pvTimeStamp;
     epics::pvData::PVTimeStamp pvTimeStamp_sp;
     epics::pvData::PVTimeStamp pvTimeStamp_rb;
-    epics::pvData::PVTimeStamp pvTimeStamp_st;
 
     bool firstTime;
 

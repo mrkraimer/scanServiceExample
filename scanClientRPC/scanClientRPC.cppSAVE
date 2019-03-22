@@ -1,0 +1,261 @@
+/*
+ * Copyright information and license terms for this software can be
+ * found in the file LICENSE that is included with the distribution
+ */
+
+/**
+ * @author Dave Hickin and Marty Kraimer
+ */
+
+#include <pv/pvData.h>
+#include <pv/rpcService.h>
+#include <pv/clientFactory.h>
+#include <pv/rpcClient.h>
+
+#include <string>
+#include <iostream>
+
+using namespace epics::pvData;
+using namespace epics::pvAccess;
+
+static StructureConstPtr makeRequestStructure()
+{
+    static StructureConstPtr requestStructure;
+    if (requestStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        requestStructure = fieldCreate->createFieldBuilder()->
+            add("method", pvString)->
+            createStructure();
+    }
+    return requestStructure;
+}
+
+static StructureConstPtr makePointStructure()
+{
+    static StructureConstPtr pointStructure;
+    if (pointStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        pointStructure = fieldCreate->createFieldBuilder()->
+            setId("point_t")->
+            add("x",pvDouble)->
+            add("y",pvDouble)->
+            createStructure();
+    }
+    return pointStructure;
+}
+
+static StructureConstPtr makeArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        argStructure = fieldCreate->createFieldBuilder()->
+            createStructure();
+    }
+    return argStructure;
+}
+
+static StructureConstPtr makeConfigureArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+
+        argStructure = fieldCreate->createFieldBuilder()->
+            addArray("value", makePointStructure())->
+            createStructure();
+    }
+    return argStructure;
+}
+
+// Set a pvAccess connection timeout, after which the client gives up trying 
+// to connect to server.
+const static double DEFAULT_TIMEOUT = 3.0;
+
+void usage_help() {
+    std::cout <<  "Usage:\n"
+              <<  "For help on commands run supplying the arguments:\n"
+              <<  "help <command>\n"
+              <<  std::endl;
+    }
+
+void usage_configure()
+{
+    std::cout <<  "Usage:\n"
+              <<  "Run application supplying the arguments:\n"
+              <<  "configure x_1 y_1 [x_2 y_2] ... [x_n y_n]\n"
+              <<  "Sets the sequence of points through which "
+              <<  DEVICE_NAME + " will move\n"
+              <<  "to (x_i,y_i), i = 1..n"
+              <<  " and changes state to READY.\n"
+              <<  "Device must be IDLE.\n"
+              <<  std::endl;
+}
+
+void usage_start()
+{
+    std::cout <<  "Usage:\n"
+              <<  "Run application supplying the argument:\n"
+              <<  "start\n"
+              <<  "Starts the device moving through the sequence of points supplied on\n"
+              <<  "configuration, changes state to RUNNING and returns.\n"
+              <<  "No additional arguments are required.\n"
+              <<  "Device must be READY.\n"
+              <<  std::endl;
+}
+
+void usage_stop()
+{
+    std::cout <<  "Usage:\n"
+              <<  "Run application supplying the argument:\n"
+              <<  "stop\n"
+              <<  "Stops any scan in progress and changes state to READY.\n"
+              <<  "Blocking scan operation in progress will return an error.\n"
+              <<  "No additional arguments are required.\n"
+              <<  "Device can be any state except IDLE.\n"
+              <<  std::endl;
+}
+
+void usage();
+
+void usage(const std::string & command)
+{
+    if (command == std::string("configure"))
+            usage_configure();
+    else if (command == std::string("start"))
+            usage_start();
+    else if (command == std::string("stop"))
+            usage_stop();
+    else
+    {
+        std::cout << "Unknown command " << command;
+        usage();
+    }
+}
+
+PVStructurePtr createConfigArgs(int argc, char *argv[])
+{
+    PVStructurePtr arguments(getPVDataCreate()->createPVStructure(makeConfigureArgumentStructure()));
+
+    PVStructureArray::svector values;
+
+    for (int i = 2; i < argc; )
+    {
+        PVStructurePtr point(getPVDataCreate()->createPVStructure(makePointStructure()));
+        point->getSubField<PVDouble>("x")->put(atof(argv[i++]));
+        point->getSubField<PVDouble>("y")->put(atof(argv[i++]));
+        values.push_back(point);
+    }
+
+	arguments->getSubField<PVStructureArray>("value")->replace(freeze(values));
+    return arguments;
+}
+
+
+int main(int argc,char *argv[])
+{
+    if(arg >1) {
+        std::string command(argv[1]);
+        if (command == std::string("help"))
+        {
+            if(argc < 3)
+            {
+                usage();
+                return 0;
+            } else {
+                usage(argv[2]);
+                return 0;
+            }
+        }
+    }
+    string channelName("scanServerPutGet");
+    bool interactive(false);
+    int opt;
+    while((opt = getopt(argc, argv, "hn:i:")) != -1) {
+        switch(opt) {
+            case 'n':
+                channelName = optarg;
+                break;
+            case 'h':
+             cout << " -h -n channelName -i interactive " << endl;
+             cout << "default" << endl;
+             cout << " -n " <<  channelName
+                  << " -i " << (interactive ? "true" : "false") 
+                  << endl;           
+                return 0;
+            case 'd' :
+               if(string(optarg)=="true") debug = true;
+               break;
+            case 'i' :
+               if(string(optarg)=="true") interactive = true;
+               break;
+            default:
+                std::cerr<<"Unknown argument: "<<opt<<"\n";
+                return -1;
+        }
+    }
+    
+    int nPvs = argc - optind;       /* Remaining arg list for not interactive */
+    cout << "_____scanClientRPC starting__\n";
+    ClientFactory::start();
+    try {   
+        PVDataCreatePtr pvDataCreate = getPVDataCreate();
+        
+        if(!interactive) {
+            if(nPvs<1) throw std::runtime_error("no command specified");
+            string command = argv[optind];
+            if(command=="configure") {
+                string input;
+                bool first = true;
+                for(int i= optind+1; i < argc; ++i)
+                {
+                    if(!first) { input += "";} else { first=false;}
+                    input += argv[i];
+                }
+                clientPutGet->putGetConfigure(input);
+            } else if(command=="start") {
+                 clientPutGet->putGetStart();
+            } else if(command=="stop") {
+                 clientPutGet->putGetStop();
+            } else {
+                cout << "unknown command\n";
+            }
+        } else {
+            while(true)
+            {
+                cout << "enter one of: exit configure start stop\n";
+                int c = std::cin.peek();  // peek character
+                if ( c == EOF ) continue;
+                string command;
+                getline(cin,command);
+                if(command.compare("exit")==0) break;
+                if(command=="configure") 
+                {
+                    cout << "enter x y values\n";
+                    string input;
+                    getline(cin,input);
+                    clientPutGet->putGetConfigure(input);
+                } else if(command=="start") {
+                     clientPutGet->putGetStart();
+                } else if(command=="stop") {
+                     clientPutGet->putGetStop();
+                } else {
+                        cout << "unknown command\n";
+                }
+                continue;
+            }
+        }
+    } catch (std::exception& e) {
+        cerr << "exception " << e.what() << endl;
+        return 1;
+    }
+    ClientFactory::stop();
+    return 0;
+}
