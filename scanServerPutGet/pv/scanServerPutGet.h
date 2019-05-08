@@ -4,7 +4,7 @@
  */
 /**
  * @author dgh Dave Hickin and Marty Kraimer
- * @date 2019.04.18
+ * @date 2019.04
  */
 
 #ifndef SCANSERVERPUTGET_H
@@ -16,7 +16,6 @@
 #include <pv/scanService.h>
 
 #include <shareLib.h>
-
 
 namespace epics { namespace exampleScan { 
 

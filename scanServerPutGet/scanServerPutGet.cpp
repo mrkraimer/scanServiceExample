@@ -71,6 +71,7 @@ static StructureConstPtr makeRecordStructure()
         recordStructure = fieldCreate->createFieldBuilder()->
             add("positionSP", makePointTopStructure())->
             add("positionRB", makePointTopStructure())->
+            add("timeStamp", getStandardField()->timeStamp())->
             addNestedStructure("argument")->
                add("command",pvString)->
                addNestedStructure("configArg")->
@@ -81,13 +82,13 @@ static StructureConstPtr makeRecordStructure()
             addNestedStructure("result")->
                add("value",pvString) ->
                endNested()->
-            add("timeStamp", getStandardField()->timeStamp())->
             createStructure();
     }
     return recordStructure;
 }
 
-ScanServerPutGet::Callback::shared_pointer ScanServerPutGet::Callback::create(ScanServerPutGetPtr const & record)
+ScanServerPutGet::Callback::shared_pointer ScanServerPutGet::Callback::create(
+    ScanServerPutGetPtr const & record)
 {
     return ScanServerPutGet::Callback::shared_pointer(new ScanServerPutGet::Callback(record));
 }
@@ -169,8 +170,6 @@ void ScanServerPutGet::initPvt()
     initPVRecord();
 
     PVFieldPtr pvField;
-    pvTimeStamp.attach(getPVStructure()->getSubField("timeStamp"));
-
     scanService->registerCallback(
         Callback::create(std::tr1::dynamic_pointer_cast<ScanServerPutGet>(shared_from_this())));
 }

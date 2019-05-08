@@ -21,10 +21,12 @@ DIRS += scanClientPutGet
 scanClientPutGet_DEPEND_DIRS = configure
 
 DIRS += ioc
-ioc_DEPEND_DIRS = src
+ioc_DEPEND_DIRS = scanServerRPC
+ioc_DEPEND_DIRS += scanServerPutGet
 
 DIRS += iocBoot
-iocBoot_DEPEND_DIRS = src
+iocBoot_DEPEND_DIRS = scanServerRPC
+iocBoot_DEPEND_DIRS += scanServerPutGet
 
 
 include $(TOP)/configure/RULES_TOP

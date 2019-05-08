@@ -4,7 +4,7 @@
  */
 /**
  * @author dgh Dave Hickin and Marty Kraimer
- * @date 2019.04.18
+ * @date 2019.04
  */
 
 #ifndef SCANSERVERRPC_H
@@ -29,7 +29,6 @@ typedef std::tr1::shared_ptr<StartService> StartServicePtr;
 
 class StopService;
 typedef std::tr1::shared_ptr<StopService> StopServicePtr;
-
 
 class ScanRPCService;
 typedef std::tr1::shared_ptr<ScanRPCService> ScanRPCServicePtr;

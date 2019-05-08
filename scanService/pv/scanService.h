@@ -5,7 +5,7 @@
 
 /**
  * @author Dave Hickin and Marty Kraimer
- * @date 2019.04.18
+ * @date 2019.04
  */
 
 #ifndef SCANSERVICE_H
@@ -41,6 +41,7 @@ public:
     double x;
     double y;
 };
+
 inline bool operator==(const Point & lhs, const Point &rhs)
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;
