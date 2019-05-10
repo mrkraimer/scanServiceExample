@@ -97,12 +97,12 @@ void ScanService::run()
                         double scale = maxds/ds;
                         dx *= scale;
                         dy *= scale;
-                        setReadbackImpl(Point(
+                        setReadback(Point(
                             positionRB.x + dx, positionRB.y + dy));
                     }
                     else
                     {
-                        setReadbackImpl(positionSP);
+                        setReadback(positionSP);
                     }
                 }
             }
@@ -111,7 +111,7 @@ void ScanService::run()
             {
                 if (index < points.size())
                 {
-                    setSetpointImpl(points[index]);
+                    setSetpoint(points[index]);
                     ++index;
                 }
                 else
@@ -136,25 +136,13 @@ Point ScanService::getPositionReadback()
     return positionRB;
 }
 
-
 void ScanService::setSetpoint(Point sp)
-{
-    if(scanningActive) 
-    {
-        std::stringstream ss;
-        ss << "Cannot set position setpoint while scanning active ";
-        throw std::runtime_error(ss.str());
-    }
-    setSetpointImpl(sp);
-}
-
-void ScanService::setSetpointImpl(Point sp)
 {
     positionSP = sp;
     flags |= ScanService::Callback::SETPOINT_CHANGED;
 }
 
-void ScanService::setReadbackImpl(Point rb)
+void ScanService::setReadback(Point rb)
 {
     positionRB = rb;
     flags |= ScanService::Callback::READBACK_CHANGED;
@@ -171,9 +159,6 @@ void ScanService::configure(const std::vector<Point> & newPoints)
     }
     std::cout << "Configure" << std::endl;
     points = newPoints;
-
-    if (positionSP != positionRB)
-        setSetpointImpl(positionRB);
 }
 
 void ScanService::startScan()
@@ -185,6 +170,12 @@ void ScanService::startScan()
         ss << "Cannot startScan while scanning active ";
         throw std::runtime_error(ss.str());
     }
+    if(points.size()<=0) {
+        std::stringstream ss;
+        ss << "Cannot startScan because no points.";
+        throw std::runtime_error(ss.str());
+    }
+    setSetpoint(points[0]);
     std::cout << "Run" << std::endl;
     index = 0;
     scanningActive = true;

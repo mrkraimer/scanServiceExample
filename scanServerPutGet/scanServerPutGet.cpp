@@ -188,7 +188,7 @@ void ScanServerPutGet::process()
            throw std::logic_error(
                "argument.configArg.x and argument.configArg.y not same length");
         }
-        std::vector<Point> newPoints(npoints);
+        std::vector<Point> newPoints;
         PVDoubleArray::const_svector xvalue(pvx->view());
         PVDoubleArray::const_svector yvalue(pvy->view());
         for(size_t i=0; i<npoints; ++i) {

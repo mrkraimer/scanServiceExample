@@ -340,47 +340,7 @@ epics::pvAccess::RPCServiceAsync::shared_pointer ScanServerRPC::getService(
 
 void ScanServerRPC::process()
 {
-    TimeStamp timeStamp;
-    timeStamp.getCurrent();
-
-    Point newSP = Point(pvx->get(), pvy->get()); 
-    try
-    {
-        Point sp_initial = scanService->getPositionSetpoint();
-      
-        if (sp_initial != newSP)
-        {
-            scanService->setSetpoint(newSP);
-            pvTimeStamp_sp.set(timeStamp);
-        }
-    }
-    catch (std::exception& o)
-    {
-        // If write to scanService fails restore values
-        Point sp = scanService->getPositionSetpoint();
-        if (sp != newSP)
-        {
-            pvx->put(sp.x);
-            pvy->put(sp.y);
-        }
-    }
-
-    // If readback is written to, restore value
-    Point scanService_rb = scanService->getPositionReadback();
-    Point record_rb = Point(pvx_rb->get(), pvx_rb->get());
-    if (record_rb != scanService_rb)
-    {
-        pvx_rb->put(scanService_rb.x);
-        pvy_rb->put(scanService_rb.y);        
-    }
-
-    if (firstTime) {
-        pvTimeStamp_sp.set(timeStamp);
-        pvTimeStamp_rb.set(timeStamp);
-        firstTime = false;
-    }
-
-    pvTimeStamp.set(timeStamp);
+    PVRecord::process();
 }
 
 

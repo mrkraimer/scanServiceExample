@@ -77,24 +77,21 @@ public:
 public:
     static ScanServicePtr create();
     POINTER_DEFINITIONS(ScanService);
-    bool isScanning() {return scanningActive;}
     virtual bool init() { return false;}
     virtual void run();
-    void startThread() { thread->start(); }
-    void stop() {}
     void registerCallback(Callback::shared_pointer const & callback);
     bool unregisterCallback(Callback::shared_pointer const & callback);
-    void update();
     Point getPositionSetpoint();
     Point getPositionReadback();
-    void setSetpoint(Point sp);
     void configure(const std::vector<Point> & newPoints);
     void startScan();
     void stopScan();
 private:
     ScanService();
-    void setSetpointImpl(Point sp);
-    void setReadbackImpl(Point rb);
+    void startThread() { thread->start(); }
+    void setSetpoint(Point sp);
+    void setReadback(Point rb);
+    void update();
     bool scanningActive;
     int flags;
     Point positionSP;
