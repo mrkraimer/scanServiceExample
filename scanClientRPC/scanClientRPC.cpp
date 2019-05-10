@@ -283,14 +283,7 @@ int main(int argc,char *argv[])
         cerr<< "multiple providers are not allowed\n";
         return 1;
     }
-    cout << "provider " << provider
-         << " channelName " <<  channelName
-         << " request " << request
-         << " debug " << (debug ? "true" : "false")
-         << " interactive " << (interactive ? "true" : "false")
-         << endl;
     int nPvs = argc - optind;       /* Remaining arg list for not interactive */
-    cout << "_____scanClientRPC starting__\n";
     if(debug) PvaClient::setDebug(true);
     try {   
         PvaClientPtr pva= PvaClient::get(provider);

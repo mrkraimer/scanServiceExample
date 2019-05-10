@@ -26,7 +26,7 @@ using std::string;
 namespace epics { namespace exampleScan {
 
 
-static StructureConstPtr makeResultStructure()
+static PVStructurePtr makeResultStructure(const std::string & result)
 {
     static StructureConstPtr resultStructure;
     if (resultStructure.get() == 0)
@@ -34,10 +34,12 @@ static StructureConstPtr makeResultStructure()
         FieldCreatePtr fieldCreate = getFieldCreate();
 
         resultStructure = fieldCreate->createFieldBuilder()->
+            add("value",pvString) ->
             createStructure();
     }
-
-    return resultStructure;
+    PVStructurePtr pvResult = getPVDataCreate()->createPVStructure(resultStructure);
+    pvResult->getSubField<PVString>("value")->put(result);
+    return pvResult;
 }
 
 static StructureConstPtr makePointStructure()
@@ -131,7 +133,7 @@ void ConfigureService::request(
         throw epics::pvAccess::RPCRequestException(
             Status::STATUSTYPE_ERROR,e.what());
     }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
+    callback->requestDone(Status::Ok,makeResultStructure("configure success"));
 }
 
 void StartService::request(
@@ -146,7 +148,7 @@ void StartService::request(
         throw epics::pvAccess::RPCRequestException(
             Status::STATUSTYPE_ERROR,e.what());
     }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
+    callback->requestDone(Status::Ok,makeResultStructure("start success"));
 }
 
 void StopService::request(
@@ -161,7 +163,7 @@ void StopService::request(
         throw epics::pvAccess::RPCRequestException(
             Status::STATUSTYPE_ERROR,e.what());
     }
-    callback->requestDone(Status::Ok,getPVDataCreate()->createPVStructure(makeResultStructure()));
+    callback->requestDone(Status::Ok,makeResultStructure("stop success"));
 }
 
 
@@ -195,7 +197,7 @@ void ScanRPCService::handleError(const std::string & message)
 
 void ScanRPCService::scanComplete()
 {
-    rpcCallback->requestDone(Status::Ok, getPVDataCreate()->createPVStructure(makeResultStructure()));
+    rpcCallback->requestDone(Status::Ok, makeResultStructure("configure success"));
     pvRecord->getScanService()->unregisterCallback(scanServiceCallback);
 }
 

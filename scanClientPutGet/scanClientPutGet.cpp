@@ -112,7 +112,6 @@ public:
         }                   
         PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
         PVStructurePtr pvStructure = putData->getPVStructure();
-cout << "pvStructure\n" << pvStructure << "\n";
         PVScalarArrayPtr pvx(pvStructure->getSubField<PVScalarArray>("argument.configArg.x"));
         if(!pvx) throw std::runtime_error("argument.configArg.x not found");
         PVScalarArrayPtr pvy(pvStructure->getSubField<PVScalarArray>("argument.configArg.y"));
@@ -229,14 +228,7 @@ int main(int argc,char *argv[])
         cerr<< "multiple providers are not allowed\n";
         return 1;
     }
-    cout << "provider " << provider
-         << " channelName " <<  channelName
-         << " request " << request
-         << " debug " << (debug ? "true" : "false")
-         << " interactive " << (interactive ? "true" : "false")
-         << endl;
     int nPvs = argc - optind;       /* Remaining arg list for not interactive */
-    cout << "_____scanClientPutGet starting__\n";
     if(debug) PvaClient::setDebug(true);
     try {   
         PvaClientPtr pva= PvaClient::get(provider);
