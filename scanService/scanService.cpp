@@ -18,6 +18,8 @@
 #include <epicsExport.h>
 #include "pv/scanService.h"
 
+using namespace std;
+
 namespace epics { namespace exampleScan {
 
 
@@ -63,7 +65,12 @@ void ScanService::update()
 }
 
 ScanService::ScanService()
-: scanningActive(false), index(0)
+: scanningActive(false),
+  index(0),
+  flags(0),
+  stepDelay(.1),
+  stepDistance(.01),
+  debug(true)
 {
    thread = EpicsThreadPtr(new epicsThread(
         *this,
@@ -78,7 +85,7 @@ void ScanService::run()
     while (true)
     {
         try {
-            epicsThreadSleep(0.1);
+            epicsThreadSleep(stepDelay);
             epics::pvData::Lock lock(mutex);
             if (scanningActive)
             {
@@ -87,8 +94,29 @@ void ScanService::run()
                     double dx = positionSP.x - positionRB.x;
                     double dy = positionSP.y - positionRB.y;
 
+                    bool movex = false;
+                    if(abs(dx) > 0.0) {
+                        movex = true;
+                        if(abs(dx)>stepDistance) {
+                           (dx>0.0 ? dx = stepDistance : dx = -stepDistance);  
+                        }
+                    }
+                    bool movey = false;
+                    if(abs(dy) > 0.0) {
+                        movey = true;
+                        if(abs(dy)>stepDistance) {
+                           (dy>0.0 ? dy = stepDistance : dy = -stepDistance);  
+                        }
+                    }
+                    if(movex || movey)
+                    {
+                        setReadback(Point(positionRB.x + dx, positionRB.y + dy));
+                    } else {
+                        setReadback(positionSP);
+                    }
+#ifdef XXX
                     const double ds = sqrt(dx*dx+dy*dy);
-                    const double maxds = 0.01;
+                    const double maxds = stepDistance;
                     // avoid very small final steps
                     const double maxds_x = maxds + 1.0e-5;
 
@@ -104,6 +132,7 @@ void ScanService::run()
                     {
                         setReadback(positionSP);
                     }
+#endif
                 }
             }
 
@@ -159,6 +188,11 @@ void ScanService::configure(const std::vector<Point> & newPoints)
     }
     std::cout << "Configure" << std::endl;
     points = newPoints;
+    if(debug) {
+       cout << "configure";
+       for(size_t i=0; i< newPoints.size();  ++i) cout << " " << points[i];
+       cout << "\n";
+    }
 }
 
 void ScanService::startScan()
@@ -175,8 +209,7 @@ void ScanService::startScan()
         ss << "Cannot startScan because no points.";
         throw std::runtime_error(ss.str());
     }
-    setSetpoint(points[0]);
-    std::cout << "Run" << std::endl;
+    if(debug) cout << "startScan\n";
     index = 0;
     scanningActive = true;
 }
@@ -186,13 +219,33 @@ void ScanService::stopScan()
     epics::pvData::Lock lock(mutex);
     if(!scanningActive) 
     {
-        std::stringstream ss;
-        ss << "Cannot stopScan unless scanning active ";
-        throw std::runtime_error(ss.str());
+        cout << "stopScan called but scan is not active\n";
+        return;
     }
-    std::cout << "Stop" << std::endl;
+    if(debug) cout << "stopScan\n";
     scanningActive = false;
 }
+
+void ScanService::setRate(double stepDelay,double stepDistance)
+{
+    epics::pvData::Lock lock(mutex);
+    if(scanningActive) 
+    {
+        std::stringstream ss;
+        ss << "Cannot setRate while scanning active";
+        throw std::runtime_error(ss.str());
+    }
+    if(debug) cout << "setRate stepDelay " << stepDelay << " stepDistance" << stepDistance << "\n"; 
+    this->stepDelay = stepDelay;
+    this->stepDistance = stepDistance;
+}
+
+void ScanService::setDebug(bool value)
+{
+    if(debug) cout << "setDebug " << (value ? "true" : "false") << "\n";
+    debug = value;
+}
+
 
 }}
 

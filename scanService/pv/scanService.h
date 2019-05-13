@@ -86,6 +86,8 @@ public:
     void configure(const std::vector<Point> & newPoints);
     void startScan();
     void stopScan();
+    void setRate(double stepDelay,double stepDistance);
+    void setDebug(bool value);
 private:
     ScanService();
     void startThread() { thread->start(); }
@@ -93,11 +95,15 @@ private:
     void setReadback(Point rb);
     void update();
     bool scanningActive;
+    size_t index;
     int flags;
+    double stepDelay;
+    double stepDistance;
+    bool debug;
+
     Point positionSP;
     Point positionRB;
     std::vector<Callback::shared_pointer> callbacks;
-    size_t index;
     std::vector<Point> points;
     epics::pvData::Mutex mutex;
     EpicsThreadPtr thread;

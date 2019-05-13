@@ -193,7 +193,7 @@ void ScanServerPutGet::process()
         PVDoubleArray::const_svector yvalue(pvy->view());
         for(size_t i=0; i<npoints; ++i) {
              double x = xvalue[i];
-             double y = xvalue[i];
+             double y = yvalue[i];
              newPoints.push_back(Point(x,y));
         }
         try {
