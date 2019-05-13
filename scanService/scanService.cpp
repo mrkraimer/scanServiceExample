@@ -70,7 +70,7 @@ ScanService::ScanService()
   flags(0),
   stepDelay(.1),
   stepDistance(.01),
-  debug(true)
+  debug(false)
 {
    thread = EpicsThreadPtr(new epicsThread(
         *this,
@@ -93,49 +93,26 @@ void ScanService::run()
                 {
                     double dx = positionSP.x - positionRB.x;
                     double dy = positionSP.y - positionRB.y;
-
-                    bool movex = false;
-                    if(abs(dx) > 0.0) {
-                        movex = true;
-                        if(abs(dx)>stepDistance) {
-                           (dx>0.0 ? dx = stepDistance : dx = -stepDistance);  
-                        }
-                    }
-                    bool movey = false;
-                    if(abs(dy) > 0.0) {
-                        movey = true;
-                        if(abs(dy)>stepDistance) {
-                           (dy>0.0 ? dy = stepDistance : dy = -stepDistance);  
-                        }
-                    }
-                    if(movex || movey)
-                    {
-                        setReadback(Point(positionRB.x + dx, positionRB.y + dy));
-                    } else {
+                    double absx = abs(dx);
+                    if(absx<=stepDistance) dx = 0.0;
+                    double absy = abs(dy);
+                    if(absy<=stepDistance) dy = 0.0;
+                    if(dx==0.0 && dy==0.0) {
                         setReadback(positionSP);
+                        continue;
                     }
-#ifdef XXX
-                    const double ds = sqrt(dx*dx+dy*dy);
-                    const double maxds = stepDistance;
-                    // avoid very small final steps
-                    const double maxds_x = maxds + 1.0e-5;
-
-                    if (ds > maxds_x)
-                    {
-                        double scale = maxds/ds;
-                        dx *= scale;
-                        dy *= scale;
-                        setReadback(Point(
-                            positionRB.x + dx, positionRB.y + dy));
+                    bool dxLarger = (absx>absy) ? true : false;
+                    if(dx!=0.0) {
+                        if(dx>0.0) {dx = stepDistance;} else {dx = -stepDistance;}
+                        if(!dxLarger && dy!=0.0) dx = dx*(absx/absy);
                     }
-                    else
-                    {
-                        setReadback(positionSP);
+                    if(dy!=0.0) {
+                        if(dy>0.0) {dy = stepDistance;} else {dy = -stepDistance;}
+                        if(dxLarger && dx!=0.0) dy = dy*(absy/absx);
                     }
-#endif
+                    setReadback(Point(positionRB.x + dx, positionRB.y + dy));
                 }
             }
-
             if (scanningActive && positionRB == positionSP)
             {
                 if (index < points.size())
@@ -186,7 +163,6 @@ void ScanService::configure(const std::vector<Point> & newPoints)
         ss << "Cannot configure while scanning active ";
         throw std::runtime_error(ss.str());
     }
-    std::cout << "Configure" << std::endl;
     points = newPoints;
     if(debug) {
        cout << "configure";
