@@ -76,6 +76,34 @@ static StructureConstPtr makeConfigureArgumentStructure()
     return argStructure;
 }
 
+static StructureConstPtr makeSetRateArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+        argStructure = fieldCreate->createFieldBuilder()->
+            add("stepDelay",pvDouble)->
+            add("stepDistance",pvDouble)->
+            createStructure();
+    }
+    return argStructure;
+}
+
+static StructureConstPtr makeSetDebugArgumentStructure()
+{
+    static StructureConstPtr argStructure;
+    if (argStructure.get() == 0)
+    {
+        FieldCreatePtr fieldCreate = getFieldCreate();
+        argStructure = fieldCreate->createFieldBuilder()->
+            add("value",pvBoolean)->
+            createStructure();
+    }
+    return argStructure;
+}
+
+
 
 class ClientRPC;
 typedef std::tr1::shared_ptr<ClientRPC> ClientRPCPtr;
@@ -211,6 +239,36 @@ public:
         PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
         cout << "response\n" << response << "\n";       
     }
+
+    void commandSetRate(double stepDelay,double stepDistance)
+    {
+        PVStructurePtr pvArguments(
+             getPVDataCreate()->createPVStructure(
+                 makeSetRateArgumentStructure()));
+        PVDoublePtr pvStepDelay = pvArguments->getSubField<PVDouble>("stepDelay");
+        PVDoublePtr pvStepDistance = pvArguments->getSubField<PVDouble>("stepDistance");
+        pvStepDelay->put(stepDelay);
+        pvStepDistance->put(stepDistance);
+        PVStructurePtr pvRequest = 
+             getPVDataCreate()->createPVStructure(makeRequestStructure());
+        pvRequest->getSubFieldT<PVString>("method")->put("setRate");
+        PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
+        cout << "response\n" << response << "\n";       
+    }
+
+    void commandSetDebug(bool value)
+    {
+        PVStructurePtr pvArguments(
+             getPVDataCreate()->createPVStructure(
+                 makeSetDebugArgumentStructure()));
+        PVBooleanPtr pvValue = pvArguments->getSubField<PVBoolean>("value");
+        pvValue->put(value);
+        PVStructurePtr pvRequest = 
+             getPVDataCreate()->createPVStructure(makeRequestStructure());
+        pvRequest->getSubFieldT<PVString>("method")->put("setDebug");
+        PVStructurePtr response(pvaClientChannel->rpc(pvRequest,pvArguments));
+        cout << "response\n" << response << "\n";
+    }
 };
 
 static void help()
@@ -221,6 +279,8 @@ static void help()
     cout << "   configure x0 y0 ... xn yn\n";
     cout << "   start\n";
     cout << "   stop\n";
+    cout << "   setRate stepDelay stepDistance\n";
+    cout << "   setDebug true|false\n";
 }
 
 int main(int argc,char *argv[])
@@ -305,6 +365,20 @@ int main(int argc,char *argv[])
                  clientRPC->commandStart();
             } else if(command=="stop") {
                  clientRPC->commandStop();
+            } else if(command=="setRate") {
+                 if(nPvs!=3) {
+                      throw std::runtime_error("illegal number of arguments");
+                 }
+                 double stepDelay = stod(argv[optind+1]);
+                 double stepDistance = stod(argv[optind+2]);
+                 clientRPC->commandSetRate(stepDelay,stepDistance);
+            } else if(command=="setDebug") {
+                 if(nPvs!=2) {
+                      throw std::runtime_error("illegal number of arguments");
+                 }
+                 string sval = argv[optind+1];
+                 bool value = (sval=="true" ? "true" : "false");
+                 clientRPC->commandSetDebug(value);
             } else {
                 cout << "unknown command\n";
             }
@@ -327,6 +401,21 @@ int main(int argc,char *argv[])
                      clientRPC->commandStart();
                 } else if(command=="stop") {
                      clientRPC->commandStop();
+                } else if(command=="setRate") {
+                     cout << "enter stepDelay\n";
+                     string input;
+                     getline(cin,input);
+                     double stepDelay = stod(input);
+                     cout << "enter stepDistance\n";
+                     getline(cin,input);
+                     double stepDistance = stod(input);
+                     clientRPC->commandSetRate(stepDelay,stepDistance);
+                } else if(command=="setDebug") {
+                     cout << "enter true or false\n";
+                     string input;
+                     getline(cin,input);
+                     bool value = (input=="true" ? "true" : "false");
+                     clientRPC->commandSetDebug(value);
                 } else {
                         cout << "unknown command\n";
                 }

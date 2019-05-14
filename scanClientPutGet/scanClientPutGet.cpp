@@ -156,6 +156,49 @@ public:
         pvCommand->put("stop");
         pvaClientPutGet->putGet();
     }
+
+    void putGetSetRate(double stepDelay,double stepDistance)
+    {
+        if(!channelConnected) {
+            cout << channelName << " channel not connected\n";
+            return;
+        }
+        PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
+        PVStructurePtr pvStructure = putData->getPVStructure();
+        PVDoublePtr pvStepDelay(pvStructure->getSubField<PVDouble>("argument.rateArg.stepDelay"));
+        if(!pvStepDelay) throw std::runtime_error("argument.rateArg.stepDelay not found");
+        PVDoublePtr pvStepDistance(pvStructure->getSubField<PVDouble>("argument.rateArg.stepDistance"));
+        if(!pvStepDistance) throw std::runtime_error("argument.rateArg.stepDistance not found");
+        pvStepDelay->put(stepDelay);
+        pvStepDistance->put(stepDistance);
+        PVStringPtr pvCommand(pvStructure->getSubField<PVString>("argument.command"));
+        if(!pvCommand) throw std::runtime_error("argument.command not found");
+        pvCommand->put("setRate");
+        pvaClientPutGet->putGet();
+        PvaClientGetDataPtr getData = pvaClientPutGet->getGetData();
+        cout << getData->getPVStructure() << endl;
+    }
+
+    void putGetSetDebug(bool value)
+    {
+        if(!channelConnected) {
+            cout << channelName << " channel not connected\n";
+            return;
+        }
+        PvaClientPutDataPtr putData = pvaClientPutGet->getPutData();
+        PVStructurePtr pvStructure = putData->getPVStructure();
+        PVBooleanPtr pvDebug(pvStructure->getSubField<PVBoolean>("argument.debugArg.value"));
+        if(!pvDebug) throw std::runtime_error("argument.debugArg.value not found");
+        pvDebug->put(value);
+        PVStringPtr pvCommand(pvStructure->getSubField<PVString>("argument.command"));
+        if(!pvCommand) throw std::runtime_error("argument.command not found");
+        pvCommand->put("setDebug");
+        pvaClientPutGet->putGet();
+        PvaClientGetDataPtr getData = pvaClientPutGet->getGetData();
+        cout << getData->getPVStructure() << endl;
+    }
+
+
 };
 
 static void help()
@@ -166,6 +209,8 @@ static void help()
     cout << "   configure x0 y0 ... xn yn\n";
     cout << "   start\n";
     cout << "   stop\n";
+    cout << "   setRate stepDelay stepDistance\n";
+    cout << "   setDebug true|false\n";
 }
 
 int main(int argc,char *argv[])
@@ -250,13 +295,27 @@ int main(int argc,char *argv[])
                  clientPutGet->putGetStart();
             } else if(command=="stop") {
                  clientPutGet->putGetStop();
+            } else if(command=="setRate") {
+                 if(nPvs!=3) {
+                      throw std::runtime_error("illegal number of arguments");
+                 }
+                 double stepDelay = stod(argv[optind+1]);
+                 double stepDistance = stod(argv[optind+2]);
+                 clientPutGet->putGetSetRate(stepDelay,stepDistance);
+            } else if(command=="setDebug") {
+                 if(nPvs!=2) {
+                      throw std::runtime_error("illegal number of arguments");
+                 }
+                 string sval = argv[optind+1];
+                 bool value = (sval=="true" ? "true" : "false");
+                 clientPutGet->putGetSetDebug(value);
             } else {
                 cout << "unknown command\n";
             }
         } else {
             while(true)
             {
-                cout << "enter one of: exit configure start stop\n";
+                cout << "enter one of: exit configure start stop setRate setDebug\n";
                 int c = std::cin.peek();  // peek character
                 if ( c == EOF ) continue;
                 string command;
@@ -272,6 +331,21 @@ int main(int argc,char *argv[])
                      clientPutGet->putGetStart();
                 } else if(command=="stop") {
                      clientPutGet->putGetStop();
+                } else if(command=="setRate") {
+                     cout << "enter stepDelay\n";
+                     string input;
+                     getline(cin,input);
+                     double stepDelay = stod(input);
+                     cout << "enter stepDistance\n";
+                     getline(cin,input);
+                     double stepDistance = stod(input);
+                     clientPutGet->putGetSetRate(stepDelay,stepDistance);
+                } else if(command=="setDebug") {
+                     cout << "enter true or false\n";
+                     string input;
+                     getline(cin,input);
+                     bool value = (input=="true" ? "true" : "false");
+                     clientPutGet->putGetSetDebug(value);
                 } else {
                         cout << "unknown command\n";
                 }

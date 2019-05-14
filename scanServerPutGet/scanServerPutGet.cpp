@@ -78,6 +78,13 @@ static StructureConstPtr makeRecordStructure()
                   addArray("x",pvDouble) ->
                   addArray("y",pvDouble) ->
                   endNested()->
+               addNestedStructure("rateArg")->
+                  add("stepDelay",pvDouble) ->
+                  add("stepDistance",pvDouble) ->
+                  endNested()->
+               addNestedStructure("debugArg")->
+                  add("value",pvBoolean) ->
+                  endNested()->
                endNested()->
             addNestedStructure("result")->
                add("value",pvString) ->
@@ -221,6 +228,30 @@ void ScanServerPutGet::process()
            string result("exception ");
            result += e.what();
            pvResult->put(result);
+       }
+     } else if(command=="setRate") {
+        PVDoublePtr pvStepDelay(pvStructure->getSubField<PVDouble>("argument.rateArg.stepDelay"));
+        PVDoublePtr pvStepDistance(pvStructure->getSubField<PVDouble>("argument.rateArg.stepDistance"));
+        double stepDelay = pvStepDelay->get();
+        double stepDistance = pvStepDistance->get();
+        try {
+            getScanService()->setRate(stepDelay,stepDistance);;
+            pvResult->put("configure success");
+        } catch (std::exception& e) {
+            string result("exception ");
+            result += e.what();
+            pvResult->put(result);
+       }
+     } else if(command=="setDebug") {
+        PVBooleanPtr pvDebug(pvStructure->getSubField<PVBoolean>("argument.debugArg.value"));
+        bool debug = pvDebug->get();
+        try {
+            getScanService()->setDebug(debug);;
+            pvResult->put("configure success");
+        } catch (std::exception& e) {
+            string result("exception ");
+            result += e.what();
+            pvResult->put(result);
        }
     } else {
        pvResult->put("illegal command index");

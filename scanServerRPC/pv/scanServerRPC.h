@@ -30,6 +30,13 @@ typedef std::tr1::shared_ptr<StartService> StartServicePtr;
 class StopService;
 typedef std::tr1::shared_ptr<StopService> StopServicePtr;
 
+class SetRateService;
+typedef std::tr1::shared_ptr<SetRateService> SetRateServicePtr;
+
+class SetDebugService;
+typedef std::tr1::shared_ptr<SetDebugService> SetDebugServicePtr;
+
+
 class ScanRPCService;
 typedef std::tr1::shared_ptr<ScanRPCService> ScanRPCServicePtr;
 
@@ -105,6 +112,56 @@ public:
     ); 
 private:
     StopService(ScanServerRPCPtr const & pvRecord)
+    : pvRecord(pvRecord)
+    {
+    }
+
+    ScanServerRPCPtr pvRecord;
+};
+
+class epicsShareClass SetRateService :
+    public virtual epics::pvAccess::RPCServiceAsync
+{
+public:
+    POINTER_DEFINITIONS(SetRateService);
+
+    static SetRateService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
+    {
+        return SetRateServicePtr(new SetRateService(pvRecord));
+    }
+    ~SetRateService() {};
+
+    void request(
+        epics::pvData::PVStructurePtr const & args,
+        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
+    ); 
+private:
+    SetRateService(ScanServerRPCPtr const & pvRecord)
+    : pvRecord(pvRecord)
+    {
+    }
+
+    ScanServerRPCPtr pvRecord;
+};
+
+class epicsShareClass SetDebugService :
+    public virtual epics::pvAccess::RPCServiceAsync
+{
+public:
+    POINTER_DEFINITIONS(SetDebugService);
+
+    static SetDebugService::shared_pointer create(ScanServerRPCPtr const & pvRecord)
+    {
+        return SetDebugServicePtr(new SetDebugService(pvRecord));
+    }
+    ~SetDebugService() {};
+
+    void request(
+        epics::pvData::PVStructurePtr const & args,
+        epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
+    ); 
+private:
+    SetDebugService(ScanServerRPCPtr const & pvRecord)
     : pvRecord(pvRecord)
     {
     }

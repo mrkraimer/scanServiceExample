@@ -8,13 +8,11 @@
  *
  */
 
-
-
-#include <epicsThread.h>
-
 #include <cmath>
+#include <iostream>
 #include <sstream>
-
+#include <pv/pvDatabase.h>
+#include <epicsThread.h>
 #include <epicsExport.h>
 #include "pv/scanService.h"
 
@@ -28,41 +26,6 @@ ScanServicePtr ScanService::create()
     return ScanServicePtr(new ScanService());
 }
 
-void ScanService::registerCallback(Callback::shared_pointer const & callback)
-{
-    epics::pvData::Lock lock(mutex);
-    if (find(callbacks.begin(),callbacks.end(), callback) != callbacks.end()) return;
-
-    callbacks.push_back(callback);
-}
-
-bool ScanService::unregisterCallback(ScanService::Callback::shared_pointer const & callback)
-{
-    epics::pvData::Lock lock(mutex);
-    std::vector<Callback::shared_pointer>::iterator foundCB
-        = find(callbacks.begin(),callbacks.end(), callback);
-    bool found = foundCB == callbacks.end();
-    callbacks.erase(foundCB);
-    return found;
-}
-
-void ScanService::update()
-{
-    epics::pvData::Lock lock(mutex);
-    std::vector<Callback::shared_pointer> callbacks = this->callbacks;
-
-    if (flags != 0)
-    {
-        for (std::vector<Callback::shared_pointer>::iterator
-                 it = callbacks.begin();
-             it != callbacks.end(); ++it)
-        {
-            (*it)->update(flags);
-        }
-
-        flags = 0;
-    }
-}
 
 ScanService::ScanService()
 : scanningActive(false),
@@ -129,6 +92,41 @@ void ScanService::run()
         }
         catch (...) { abort(); }
         update();
+    }
+}
+
+void ScanService::registerCallback(Callback::shared_pointer const & callback)
+{
+    epics::pvData::Lock lock(mutex);
+    if (find(callbacks.begin(),callbacks.end(), callback) != callbacks.end()) return;
+    callbacks.push_back(callback);
+}
+
+bool ScanService::unregisterCallback(ScanService::Callback::shared_pointer const & callback)
+{
+    epics::pvData::Lock lock(mutex);
+    std::vector<Callback::shared_pointer>::iterator foundCB
+        = find(callbacks.begin(),callbacks.end(), callback);
+    bool found = foundCB == callbacks.end();
+    if(found) callbacks.erase(foundCB);
+    return found;
+}
+
+void ScanService::update()
+{
+    epics::pvData::Lock lock(mutex);
+    std::vector<Callback::shared_pointer> callbacks = this->callbacks;
+
+    if (flags != 0)
+    {
+        for (std::vector<Callback::shared_pointer>::iterator
+                 it = callbacks.begin();
+             it != callbacks.end(); ++it)
+        {
+            (*it)->update(flags);
+        }
+
+        flags = 0;
     }
 }
 
@@ -199,6 +197,7 @@ void ScanService::stopScan()
         return;
     }
     if(debug) cout << "stopScan\n";
+    flags |= ScanService::Callback::SCAN_COMPLETE;
     scanningActive = false;
 }
 
@@ -211,7 +210,7 @@ void ScanService::setRate(double stepDelay,double stepDistance)
         ss << "Cannot setRate while scanning active";
         throw std::runtime_error(ss.str());
     }
-    if(debug) cout << "setRate stepDelay " << stepDelay << " stepDistance" << stepDistance << "\n"; 
+    if(debug) cout << "setRate stepDelay " << stepDelay << " stepDistance " << stepDistance << "\n"; 
     this->stepDelay = stepDelay;
     this->stepDistance = stepDistance;
 }

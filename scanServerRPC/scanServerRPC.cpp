@@ -4,8 +4,8 @@
  */
 
 /**
- * @author dgh Dave Hickin and Marty Kraimer
- * @date 2019.04.18
+ * @author Dave Hickin and Marty Kraimer
+ * @date 2019.05
  */
 
 #include <pv/standardField.h>
@@ -97,25 +97,23 @@ void ConfigureService::request(
 )
 {
     PVStructureArrayPtr valueField = args->getSubField<PVStructureArray>("value");
-    if (valueField.get() == 0)
+    if (!valueField) {
         throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
             "No structure array value field");
-
+    }
     StructureConstPtr valueFieldStructure = valueField->
         getStructureArray()->getStructure();
 
     ScalarConstPtr xField = valueFieldStructure->getField<Scalar>("x");
-    if (xField.get() == 0 || xField->getScalarType() != pvDouble)
+    if (!xField || xField->getScalarType() != pvDouble) {
         throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
             "value field's structure has no double field x");
-
+    }
     ScalarConstPtr yField = valueFieldStructure->getField<Scalar>("y");
-    if (xField.get() == 0 || xField->getScalarType() != pvDouble)
+    if (!yField || yField->getScalarType() != pvDouble)
         throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
             "value field's structure has no double field y");
-
     PVStructureArray::const_svector vals = valueField->view();
-    
     std::vector<Point> newPoints;
     newPoints.reserve(vals.size());
     for (PVStructureArray::const_svector::const_iterator it = vals.begin();
@@ -166,6 +164,53 @@ void StopService::request(
     callback->requestDone(Status::Ok,makeResultStructure("stop success"));
 }
 
+void SetRateService::request(
+    PVStructure::shared_pointer const & args,
+    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
+)
+{
+    PVDoublePtr pvStepDelay = args->getSubField<PVDouble>("stepDelay");
+    if(!pvStepDelay) {
+        throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
+            "No stepDelay field");
+    }
+    PVDoublePtr pvStepDistance = args->getSubField<PVDouble>("stepDistance");
+    if(!pvStepDistance) {
+        throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
+            "No stepDistance field");
+    }
+    double stepDelay = pvStepDelay->get();
+    double stepDistance = pvStepDistance->get();
+    try {
+        pvRecord->getScanService()->setRate(stepDelay,stepDistance);
+    }
+    catch (std::exception& e) {
+        throw epics::pvAccess::RPCRequestException(
+            Status::STATUSTYPE_ERROR,e.what());
+    }
+    callback->requestDone(Status::Ok,makeResultStructure("setRate success"));
+}
+
+void SetDebugService::request(
+    PVStructure::shared_pointer const & args,
+    epics::pvAccess::RPCResponseCallback::shared_pointer const & callback
+)
+{
+    PVBooleanPtr pvDebug = args->getSubField<PVBoolean>("value");
+    if(!pvDebug) {
+        throw pvAccess::RPCRequestException(Status::STATUSTYPE_ERROR,
+            "No value field");
+    }
+    bool value = pvDebug->get();
+    try {
+        pvRecord->getScanService()->setDebug(value);
+    }
+    catch (std::exception& e) {
+        throw epics::pvAccess::RPCRequestException(
+            Status::STATUSTYPE_ERROR,e.what());
+    }
+    callback->requestDone(Status::Ok,makeResultStructure("setDebug success"));
+}
 
 ScanRPCService::Callback::shared_pointer ScanRPCService::Callback::create(ScanRPCServicePtr const & service)
 {
@@ -321,16 +366,20 @@ epics::pvAccess::RPCServiceAsync::shared_pointer ScanServerRPC::getService(
             return ConfigureService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
-        }
-        else if (method == "start")
-        {
+        } else if (method == "start") {
             return StartService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
-        }
-        else if (method == "stop")
-        {
+        } else if (method == "stop") {
             return StopService::create(
+                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
+                 shared_from_this()));
+        } else if (method == "setRate") {
+            return SetRateService::create(
+                 std::tr1::dynamic_pointer_cast<ScanServerRPC>(
+                 shared_from_this()));
+        } else if (method == "setDebug") {
+            return SetDebugService::create(
                  std::tr1::dynamic_pointer_cast<ScanServerRPC>(
                  shared_from_this()));
         }
