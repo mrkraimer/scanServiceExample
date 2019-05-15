@@ -273,8 +273,7 @@ public:
 
 static void help()
 {
-    cout << "if -i is specified then interactive mode is specified\n"
-         << "     in this case enter -h for details\n";
+    cout << "if interactive is specified then interactive mode is specified\n";
     cout << "following are choices for non interactive mode:\n";
     cout << "   configure x0 y0 ... xn yn\n";
     cout << "   start\n";
@@ -290,72 +289,27 @@ int main(int argc,char *argv[])
         help();
         return 0;
     }
+    bool interactive(false);
     if(argc==2)
     {
         string value(argv[1]);
-        if(value=="help")
-        {
-            help();
-            return 0;
-        }
+        if(value.size()>0 && value[0]=='i') interactive = true;
     }
     string provider("pva");
     string channelName("scanServerRPC");
     string request("putField(argument)getField(result)");
-    bool debug(false);
-    bool interactive(false);
-    int opt;
-    while((opt = getopt(argc, argv, "hp:n:r:d:i:")) != -1) {
-        switch(opt) {
-            case 'p':
-                provider = optarg;
-                break;
-            case 'n':
-                channelName = optarg;
-                break;
-            case 'r':
-                request = optarg;
-                break;
-            case 'h':
-             cout << " -h -n channelName -p provider -r request -i interactive - d debug " << endl;
-             cout << "default" << endl;
-             cout << "-p " << provider 
-                  << " -n " <<  channelName
-                  << " -r " << request
-                  << " -i " << (interactive ? "true" : "false") 
-                  << " -d " << (debug ? "true" : "false") 
-                  << endl;           
-                return 0;
-            case 'd' :
-               if(string(optarg)=="true") debug = true;
-               break;
-            case 'i' :
-               if(string(optarg)=="true") interactive = true;
-               break;
-            default:
-                std::cerr<<"Unknown argument: "<<opt<<"\n";
-                return -1;
-        }
-    }
-    bool pvaSrv(((provider.find("pva")==string::npos) ? false : true));
-    bool caSrv(((provider.find("ca")==string::npos) ? false : true));
-    if(pvaSrv&&caSrv) {
-        cerr<< "multiple providers are not allowed\n";
-        return 1;
-    }
-    int nPvs = argc - optind;       /* Remaining arg list for not interactive */
-    if(debug) PvaClient::setDebug(true);
     try {   
         PvaClientPtr pva= PvaClient::get(provider);
         ClientRPCPtr clientRPC(ClientRPC::create(pva,channelName,provider,request));
         if(!interactive) {
+            if(argc<2) throw std::runtime_error("no command specified");
             epicsThreadSleep(1.0);
-            if(nPvs<1) throw std::runtime_error("no command specified");
-            string command = argv[optind];
+            string command = argv[1];
             if(command=="configure") {
                 string input;
                 bool first = true;
-                for(int i= optind+1; i < argc; ++i)
+                if(argc<4) throw std::runtime_error("illegal number of points");
+                for(int i= 2; i < argc; ++i)
                 {
                     if(!first) { input += " ";} else { first=false;}
                     input += argv[i];
@@ -366,17 +320,13 @@ int main(int argc,char *argv[])
             } else if(command=="stop") {
                  clientRPC->commandStop();
             } else if(command=="setRate") {
-                 if(nPvs!=3) {
-                      throw std::runtime_error("illegal number of arguments");
-                 }
-                 double stepDelay = stod(argv[optind+1]);
-                 double stepDistance = stod(argv[optind+2]);
+                 if(argc!=4) throw std::runtime_error("illegal number of arguments");
+                 double stepDelay = stod(argv[2]);
+                 double stepDistance = stod(argv[3]);
                  clientRPC->commandSetRate(stepDelay,stepDistance);
             } else if(command=="setDebug") {
-                 if(nPvs!=2) {
-                      throw std::runtime_error("illegal number of arguments");
-                 }
-                 string sval = argv[optind+1];
+                 if(argc!=3) throw std::runtime_error("illegal number of arguments");
+                 string sval = argv[2];
                  bool value = (sval=="true" ? "true" : "false");
                  clientRPC->commandSetDebug(value);
             } else {
@@ -385,7 +335,7 @@ int main(int argc,char *argv[])
         } else {
             while(true)
             {
-                cout << "enter one of: exit configure start stop\n";
+                cout << "enter one of: exit configure start stop setRate setDebug\n";
                 int c = std::cin.peek();  // peek character
                 if ( c == EOF ) continue;
                 string command;

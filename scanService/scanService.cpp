@@ -57,9 +57,10 @@ void ScanService::run()
                     double dx = positionSP.x - positionRB.x;
                     double dy = positionSP.y - positionRB.y;
                     double absx = abs(dx);
-                    if(absx<=stepDistance) dx = 0.0;
+                    double del = stepDistance*.01;
+                    if(absx<=(stepDistance+del)) dx = 0.0;
                     double absy = abs(dy);
-                    if(absy<=stepDistance) dy = 0.0;
+                    if(absy<=(stepDistance+del)) dy = 0.0;
                     if(dx==0.0 && dy==0.0) {
                         setReadback(positionSP);
                         continue;
